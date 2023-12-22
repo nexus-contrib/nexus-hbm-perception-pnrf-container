@@ -12,8 +12,7 @@ namespace m
         static void Main(string[] args)
         {
             var fromDisk = new PNRFLoader();
-            var fileName = @"Z:/home/vincent/Downloads/pnrf/Recording001.pnrf";
-            var recording = fromDisk.LoadRecording(fileName);
+            var recording = fromDisk.LoadRecording(args[0]);
 
 
             Console.WriteLine("Groups");

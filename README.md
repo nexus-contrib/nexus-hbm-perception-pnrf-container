@@ -8,15 +8,9 @@ sudo docker build -t nexus-hbm-perception-pnrf-container .
 xhost +local:docker
 
 sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d nexus-hbm-perception-pnrf-container
-sudo docker exec -it pnrf-tmp bash
+sudo docker exec -it pnrf-tmp bash -c "./winetricks -q msxml6; wine PNRF\ Reader\ 08.30.22203.exe; exit"
 
-# The following commands must be run manually since they need a connected display:
-# ./winetricks -q msxml6
-# wine dotnet-sdk-5.0.408-win-x64.exe /install /quiet /norestart
-# wine PNRF\ Reader\ 08.30.22203.exe
-# exit
-
-sudo docker commit pnrf-tmp apollo3zehn:nexus-hbm-perception-pnrf-container
+sudo docker commit pnrf-tmp docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
 ```
 
 # TODO
