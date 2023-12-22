@@ -1,4 +1,6 @@
-# How to prepare Docker container
+This repository aims to provide access to the propriertary PNRF Reader Toolkit (https://www.hbm.com/de/7557/anbindung-von-genesis-highspeed-und-oder-perception/) so that [Nexus](https://github.com/malstroem-labs/nexus) is able to read HBM Perception `.pnrf` files.
+
+# Prepare the Docker container
 
 ```bash
 sudo docker build -t nexus-hbm-perception-pnrf-container .
@@ -11,18 +13,25 @@ sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d nexus-hbm-
 sudo docker exec -it pnrf-tmp bash -c "./winetricks -q msxml6; wine PNRF\ Reader\ 08.30.22203.exe; exit"
 
 sudo docker commit pnrf-tmp docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
+sudo docker push docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
 ```
 
-# TODO
+# Prepare the application
+
+The docker container does not contain the actual code to read PNRF data to speed up the development cycle. The code itself may be mounted into the container and compiled there (.NET 8 SDK is availabe within the container) like this:
 
 ```bash
-WINEARCH="win64" WINEPREFIX="/home/vincent/Downloads/pnrf_prefix" DOTNET_ROOT="C:/Program Files/dotnet/" wine dotnet run --project "Z:/home/vincent/Downloads/PNRF Reader/pnrf.csproj"
-
-#     wine dotnet publish Z:/src/pnrf.csproj --self-contained --runtime win-x64 --output .
+cd <source folder>
+dotnet publish --self-contained --runtime win-x64 --output /app
 ```
 
-1. Install PNRF Reader 6.30.22203.exe
-2. Compile the following project without any code:
+The executable is then available by running `wine /app/HbmPnrf.exe`. This executable expects specific parameters as it tries to connect to a Nexus instance and is only usable in a meaningful way from via Nexus.
+
+In case you want to start from scratch (e.g. if PNRF Reader got an update), it is necessary to create `Interop.RecordingInterface.dll` and `Interop.RecordingLoaders.dll` first by doing the following:
+
+1. Install `PNRF Reader 6.30.22203.exe` on a Windows machine
+
+2. Put the following xml in a file named `HbmPnrf-Interop.csproj` and compile that project:
 
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -52,6 +61,6 @@ WINEARCH="win64" WINEPREFIX="/home/vincent/Downloads/pnrf_prefix" DOTNET_ROOT="C
   </ItemGroup>
 </Project>
 
-3. Copy Interop.RecordingInterface.dll and Interop.RecordingLoaders.dll from the resulting obj/ directory into a new lib/ directory
+3. Copy `Interop.RecordingInterface.dll` and `Interop.RecordingLoaders.dll` from the resulting `obj/` directory into the `src/lib/` directory
 
-4. Run and code pnrf.csproj from this folder
+4. Compile `HbmPnrf.csproj`

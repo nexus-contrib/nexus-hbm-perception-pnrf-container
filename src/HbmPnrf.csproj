@@ -1,9 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Nexus.Remoting" Version="2.0.0-beta.2" />
+  </ItemGroup>
+
   <ItemGroup>
     <Reference Include="Interop.RecordingInterface">
       <HintPath>lib\Interop.RecordingInterface.dll</HintPath>

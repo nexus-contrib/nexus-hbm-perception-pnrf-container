@@ -12,7 +12,8 @@ RUN dpkg --add-architecture i386 &&\
     # start openssh-server
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' '/etc/ssh/sshd_config' &&\
     service ssh start &&\
-    # download winetricks
+    # download winetricks (and fix missing win64 executable: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1031649)
+    ln -s /usr/bin/wine /usr/bin/wine64 &&\
     curl -o winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks &&\
     chmod +x winetricks &&\
     # download PNRF Reader (COM libraries)
