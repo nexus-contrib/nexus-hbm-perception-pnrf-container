@@ -6,6 +6,8 @@ using Nexus.Extensibility;
 using RecordingInterface;
 using RecordingLoaders;
 
+namespace Nexus.Sources;
+
 public class HbmPnrfDataSource : SimpleDataSource
 {
     record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory);
@@ -18,7 +20,9 @@ public class HbmPnrfDataSource : SimpleDataSource
     {
         get
         {
-            _root ??= (Context.ResourceLocator ?? throw new Exception("The resource locator is null")).ToPath();
+            _root ??= (Context.ResourceLocator ?? throw new Exception("The resource locator is null"))
+                .ToPath()
+                .Replace("/var/lib/data/", "Z:/volume1/Daten/raw/");
 
             return _root;
         }
@@ -89,17 +93,25 @@ public class HbmPnrfDataSource : SimpleDataSource
         {
             foreach (var channel in group.Recording.Channels.Cast<IDataChannel>())
             {
+                Logger.LogDebug("Processing channel {ChannelName}", channel.Name);
+
                 // get data source
-                if (channel.ChannelType != DataChannelType.DataChannelType_Analog)
-                {
-                    Logger.LogTrace("Channel {ChannelName} is not of type 'analog'. Skipping.", channel.Name);
-                    continue;
-                }
+                // if (channel.ChannelType != DataChannelType.DataChannelType_Analog)
+                // {
+                //     Logger.LogTrace("Channel {ChannelName} is not of type 'analog'. Skipping.", channel.Name);
+                //     continue;
+                // }
 
                 var dataSource = channel.get_DataSource(DataSourceSelect.DataSourceSelect_Mixed);
 
-                if (dataSource.DataType != DataSourceDataType.DataSourceDataType_Numerical)
+                if (!(
+                    dataSource.DataType == DataSourceDataType.DataSourceDataType_AnalogWaveform ||
+                    dataSource.DataType == DataSourceDataType.DataSourceDataType_DigitalWaveform
+                ))
+                {
+                    Logger.LogTrace("Data source is of type {DataSourceDataType} instead of 'AnalogWaveform' or 'DigitalWaveform'. Skipping.", dataSource.DataType);
                     continue;
+                }
 
                 // get segments
                 object segmentsObject;
@@ -108,7 +120,7 @@ public class HbmPnrfDataSource : SimpleDataSource
 
                 if (segmentsObject is null)
                 {
-                    Logger.LogDebug("Channel {ChannelName} has no data. Unable to determine sample period. Skipping.", channel.Name);
+                    Logger.LogDebug("Channel has no data. Unable to determine sample period. Skipping.");
                     continue;
                 }
 
@@ -132,7 +144,7 @@ public class HbmPnrfDataSource : SimpleDataSource
 
                 foreach (var segment in segments.Cast<IDataSegment>())
                 {
-                    samplePeriods.Add(TimeSpan.FromSeconds(segment.YStep));
+                    samplePeriods.Add(TimeSpan.FromSeconds(segment.SampleInterval));
                 }
 
                 foreach (var samplePeriod in samplePeriods)

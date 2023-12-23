@@ -11,7 +11,6 @@ RUN dpkg --add-architecture i386 &&\
     apt install wine32:i386 wine64 curl cabextract openssh-server -y &&\
     # start openssh-server
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' '/etc/ssh/sshd_config' &&\
-    service ssh start &&\
     # download winetricks (and fix missing win64 executable: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1031649)
     ln -s /usr/bin/wine /usr/bin/wine64 &&\
     curl -o winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks &&\
