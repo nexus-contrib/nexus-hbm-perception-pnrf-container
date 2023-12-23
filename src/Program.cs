@@ -1,4 +1,8 @@
+// Debugging:
+// File.AppendAllText("Z:/root/code/out.txt", "before" + Environment.NewLine);
+
 using Nexus.Remoting;
+using Nexus.Sources;
 
 // args
 if (args.Length < 2)
@@ -20,4 +24,5 @@ catch (Exception ex)
 }
 
 var communicator = new RemoteCommunicator(new HbmPnrfDataSource(), address, port);
+
 await communicator.RunAsync();
