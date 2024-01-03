@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Nexus.DataModel;
@@ -8,12 +10,19 @@ using RecordingLoaders;
 
 namespace Nexus.Sources;
 
+// Implementation is based on https://www.hbm.com/fileadmin/mediapool/hbmdoc/technical/i2697.pdf
+// See also section E "Sweeps and Segments" for a good introduction about how sweeps work
+
 public class HbmPnrfDataSource : SimpleDataSource
 {
     record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory);
 
+    private const string OriginalNameKey = "original-name";
+
+    private static PNRFLoader _pnrfLoader = new();
+
     private string? _root;
-    private PNRFLoader _pnrfLoader = new();
+
     private HbmPnrfConfig? _config;
 
     private string Root
@@ -72,7 +81,149 @@ public class HbmPnrfDataSource : SimpleDataSource
         IProgress<double> progress, 
         CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var filePathToRecordingMap = new Dictionary<string, IRecording>();
+
+        IRecording LoadRecording(string filePath)
+        {
+            if (!filePathToRecordingMap!.TryGetValue(filePath, out var recording))
+            {
+                recording = _pnrfLoader.LoadRecording(filePath);
+                filePathToRecordingMap[filePath] = recording;
+            }
+
+            return recording;
+        }
+
+        // find and load file
+        var searchPath = Path.Combine(Root, Config.DataDirectory);
+
+        // TODO ".Order" works probably only until Recording 999 is reached as it is unclear what happens then
+        var potentialFiles = Directory
+            .GetFiles(searchPath, "Recording*.pnrf", SearchOption.AllDirectories)
+            .Order()
+            .ToArray();
+
+        if (!potentialFiles.Any())
+        {
+            Logger.LogTrace("No files found");
+            return Task.CompletedTask;
+        }
+
+        var nearestFileIndex = FindNearestFilePath(potentialFiles, begin, LoadRecording);
+        var currentBegin = begin;
+
+        Logger.LogTrace("Nearest file path for {Begin} is {FilePath}", begin, potentialFiles[nearestFileIndex]);
+
+        for (int i = nearestFileIndex; i < potentialFiles.Length - 1; i++)
+        {
+            var filePath = potentialFiles[nearestFileIndex];
+            var fileBegin = GetFileBegin(filePath, LoadRecording);
+
+            // this file contains data for a later date: leave loop
+            if (fileBegin >= end)
+            {
+                Logger.LogTrace("No more files found for the requested time period, leaving");
+                break;
+            }
+
+            Logger.LogDebug("Processing file {FilePath}", filePath);
+
+            var recording = LoadRecording(filePath);
+
+            // for each request
+            foreach (var request in requests)
+            {
+                // find channel
+                var channelName = request.CatalogItem.Resource.Properties!
+                    .GetStringValue(OriginalNameKey)!;
+
+                var channel = recording.Channels
+                    .Cast<IDataChannel>()
+                    .FirstOrDefault(channel => channel.Name == channelName);
+
+                if (channel is null)
+                {
+                    Logger.LogTrace("Channel {ChannelName} not found, skipping", channelName);
+                    continue;
+                }
+
+                Logger.LogDebug("Processing channel {ChannelName}", channelName);
+
+                // get segments
+                /* "The safest option is to go always for the mixed datasource."
+                 * See also section E "Sweeps and Segments" for a good introduction about how sweeps work
+                 */
+                var dataSource = channel.get_DataSource(DataSourceSelect.DataSourceSelect_Mixed);
+
+                /* request all data (simple and conservative approach) */
+                var sweepStart = dataSource.Sweeps.StartTime;
+                var sweepEnd = dataSource.Sweeps.EndTime;
+                object segmentsObject;
+
+                dataSource.Data(sweepStart, sweepEnd, out segmentsObject);
+
+                if (segmentsObject is null)
+                {
+                    Logger.LogTrace("No segments available, skipping");
+                    continue;
+                }
+
+                var segments = (IDataSegments)segmentsObject;
+
+                // for each segment
+                Logger.LogTrace("Processing {SegmentCount} segments", segments.Count);
+                var segmentNumber = 0;
+
+                foreach (var segment in segments.Cast<IDataSegment>())
+                {
+                    Logger.LogTrace("Processing segment {SegmentNumber}", segmentNumber);
+                    segmentNumber++;
+
+                    // validate sample period
+                    var samplePeriod = TimeSpan.FromSeconds(segment.SampleInterval);
+
+                    if (samplePeriod != request.CatalogItem.Representation.SamplePeriod)
+                    {
+                        Logger.LogTrace("No matching sample period available in current segment, skipping");
+                        continue;
+                    }
+
+                    // get absolute segment begin and end
+                    var segmentBegin = fileBegin + TimeSpan.FromSeconds(segment.StartTime);
+                    var roundedSegmentBegin = RoundDown(segmentBegin, samplePeriod);
+
+                    var segmentEnd = fileBegin + TimeSpan.FromSeconds(segment.EndTime);
+                    var roundedSegmentEnd = RoundDown(segmentEnd, samplePeriod);
+
+                    if (segmentBegin >= end)
+                    {
+                        Logger.LogTrace("No more segments found for the requested time period, leaving");
+                        break;
+                    }
+
+                    if (segmentEnd < currentBegin)
+                    {
+                        Logger.LogTrace("This segment does not contain data for the current period, skipping");
+                        continue;
+                    }
+
+                    #error continue here and calculate offset + length, set data and status and then add period to "currentBegin" (do we need currentBegin for each channel individually?)
+
+                    // read data
+                    /* no span support :-( */
+                    object dataAsObject;
+                    segment.Waveform(DataSourceResultType.DataSourceResultType_Double64, 1, iCnt, 1, out dataAsObject);
+
+                    if (dataAsObject is null)
+                    {
+                        Logger.LogTrace("No data available in segment, skipping");
+                        continue;
+                    }
+
+                    var data = dataAsObject as double[];
+                }
+            }
+        }
     }
 
     private void AddResources(ResourceCatalogBuilder catalogBuilder)
@@ -102,6 +253,7 @@ public class HbmPnrfDataSource : SimpleDataSource
                 //     continue;
                 // }
 
+                // "The safest option is to go always for the mixed datasource."
                 var dataSource = channel.get_DataSource(DataSourceSelect.DataSourceSelect_Mixed);
 
                 if (!(
@@ -134,7 +286,8 @@ public class HbmPnrfDataSource : SimpleDataSource
                 }
 
                 var resourceBuilder = new ResourceBuilder(id: resourceId)
-                    .WithGroups(group.Name);
+                    .WithGroups(group.Name)
+                    .WithProperty(OriginalNameKey, channel.Name);
 
                 if (!string.IsNullOrWhiteSpace(dataSource.YUnit))
                     resourceBuilder.WithUnit(dataSource.YUnit);
@@ -170,6 +323,58 @@ public class HbmPnrfDataSource : SimpleDataSource
         newResourceId = Resource.InvalidIdStartCharsExpression.Replace(newResourceId, "");
 
         return Resource.ValidIdExpression.IsMatch(newResourceId);
+    }
+
+    private static DateTime GetFileBegin(string filePath, Func<string, IRecording> loadRecording)
+    {
+        var recording = loadRecording(filePath);
+
+        // No common file begin property has been found in the API so use the first channel for now
+        var firstChannel = recording.Channels.OfType<IDataChannel>().FirstOrDefault() 
+            ?? throw new Exception("No channels found.");
+
+        if (firstChannel is null)
+            return default;
+
+        // "The safest option is to go always for the mixed datasource."
+        var dataSource = firstChannel.get_DataSource(DataSourceSelect.DataSourceSelect_Mixed);
+
+        dataSource.GetUTCTime(out var year, out var yearDay, out var utcTime, out var valid);
+
+        if (!valid)
+            throw new Exception("No UTC time available.");
+
+        return new DateTime(year, DateTimeKind.Utc) + TimeSpan.FromDays(yearDay) + TimeSpan.FromSeconds(utcTime);
+    }
+
+    public static int FindNearestFilePath(string[] filePaths, DateTime beginToFind, Func<string, IRecording> loadRecording)
+    {
+        var left = 0;
+        var right = filePaths.Length - 1;
+        var mid = 0;
+
+        while (left <= right)
+        {
+            mid = left + (right - left) / 2;
+            var midBegin = GetFileBegin(filePaths[mid], loadRecording);
+            var compare = beginToFind.CompareTo(midBegin);
+
+            if (compare > 0)
+                left = mid + 1;
+
+            else if (compare < 0)
+                right = mid - 1;
+
+            else
+                break;
+        };
+
+        return mid;
+    }
+
+    private static DateTime RoundDown(DateTime dateTime, TimeSpan timeSpan)
+    {
+        return new DateTime(dateTime.Ticks - (dateTime.Ticks % timeSpan.Ticks), dateTime.Kind);
     }
 }
 
@@ -212,7 +417,7 @@ public class HbmPnrfDataSource : SimpleDataSource
 //             {
 //                 var dataSource = channel.get_DataSource(DataSourceSelect.DataSourceSelect_Mixed);
 //                 Console.WriteLine("Name: " + dataSource.Name);
-//                 dataSource.GetUTCTime(out var Year, out var YearDay, out var UTCTime, out var Valid);
+//                 dataSource.GetUTCTime(out var Year, out var YearDay, out var UTCTime, out var Valid); // Valid: boolean is true when UTC time is available.
 //                 Console.WriteLine("Year: " + Year);
 //                 Console.WriteLine("YearDay: " + YearDay);
 //                 Console.WriteLine("UTCTime: " + UTCTime);
