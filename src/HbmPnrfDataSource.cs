@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Nexus.DataModel;
@@ -108,10 +109,10 @@ public class HbmPnrfDataSource : SimpleDataSource
         }
 
         var nearestFileIndex = FindNearestFilePath(potentialFiles, begin, LoadRecording);
-        var currentBegin = begin;
-
+   
         Logger.LogTrace("Nearest file path for {Begin} is {FilePath}", begin, potentialFiles[nearestFileIndex]);
 
+        // for each file
         for (int i = nearestFileIndex; i < potentialFiles.Length - 1; i++)
         {
             var filePath = potentialFiles[nearestFileIndex];
@@ -170,6 +171,7 @@ public class HbmPnrfDataSource : SimpleDataSource
 
                 // for each segment
                 Logger.LogTrace("Processing {SegmentCount} segments", segments.Count);
+
                 var segmentNumber = 0;
 
                 foreach (var segment in segments.Cast<IDataSegment>())
@@ -186,12 +188,17 @@ public class HbmPnrfDataSource : SimpleDataSource
                         continue;
                     }
 
-                    // get absolute segment begin and end
+                    // compute segment read begin and segment read end
+
+                    /*
+                     *            result  begin  |          | end
+                     *    segment case 1:    [                   ]
+                     *                 2:             [          ]
+                     *                 3:             [ ]
+                     *                 4:    [          ]
+                     */
                     var segmentBegin = fileBegin + TimeSpan.FromSeconds(segment.StartTime);
                     var roundedSegmentBegin = RoundDown(segmentBegin, samplePeriod);
-
-                    var segmentEnd = fileBegin + TimeSpan.FromSeconds(segment.EndTime);
-                    var roundedSegmentEnd = RoundDown(segmentEnd, samplePeriod);
 
                     if (segmentBegin >= end)
                     {
@@ -199,18 +206,38 @@ public class HbmPnrfDataSource : SimpleDataSource
                         break;
                     }
 
-                    if (segmentEnd < currentBegin)
+                    var segmentEnd = fileBegin + TimeSpan.FromSeconds(segment.EndTime);
+                    var roundedSegmentEnd = RoundDown(segmentEnd, samplePeriod);
+
+                    if (segmentEnd < begin)
                     {
                         Logger.LogTrace("This segment does not contain data for the current period, skipping");
                         continue;
                     }
 
-                    #error continue here and calculate offset + length, set data and status and then add period to "currentBegin" (do we need currentBegin for each channel individually?)
+                    var segmentReadBegin = begin > segmentBegin
+                        ? begin
+                        : segmentBegin;
+
+                    var segmentReadEnd = end < segmentEnd
+                        ? end
+                        : segmentEnd;
+
+                    var segmentStart = (int)((segmentReadBegin - segmentBegin).Ticks / samplePeriod.Ticks);
+                    var block = (int)((segmentReadEnd - segmentReadBegin).Ticks / samplePeriod.Ticks);
 
                     // read data
-                    /* no span support :-( */
                     object dataAsObject;
-                    segment.Waveform(DataSourceResultType.DataSourceResultType_Double64, 1, iCnt, 1, out dataAsObject);
+
+                    segment.Waveform(
+                        DataSourceResultType.DataSourceResultType_Double64, 
+                        /* the programming examples of the installed PNRF Toolkit suggest 
+                         * to begin with 1 instead of 0 */
+                        FirstSample: segmentStart + 1,
+                        ResultCount: block, 
+                        Reduction: 1, 
+                        /* no span support :-( */
+                        out dataAsObject);
 
                     if (dataAsObject is null)
                     {
@@ -219,9 +246,24 @@ public class HbmPnrfDataSource : SimpleDataSource
                     }
 
                     var data = dataAsObject as double[];
+
+                    // copy to result
+                    var resultStart = (int)((segmentReadBegin - begin).Ticks / samplePeriod.Ticks);
+
+                    var slicedResult = MemoryMarshal
+                        .Cast<byte, double>(request.Data.Span)
+                        .Slice(resultStart);
+
+                    data.CopyTo(slicedResult);
+
+                    request.Status.Span
+                        .Slice(resultStart, block)
+                        .Fill(1);
                 }
             }
         }
+
+        return Task.CompletedTask;
     }
 
     private void AddResources(ResourceCatalogBuilder catalogBuilder)
@@ -354,6 +396,7 @@ public class HbmPnrfDataSource : SimpleDataSource
         while (left <= right)
         {
             mid = left + (right - left) / 2;
+
             var midBegin = GetFileBegin(filePaths[mid], loadRecording);
             var compare = beginToFind.CompareTo(midBegin);
 
@@ -375,143 +418,3 @@ public class HbmPnrfDataSource : SimpleDataSource
         return new DateTime(dateTime.Ticks - (dateTime.Ticks % timeSpan.Ticks), dateTime.Kind);
     }
 }
-
-
-// using System;
-// using RecordingLoaders;
-// using RecordingInterface;
-// using System.Text.Json;
-// using System.Linq;
-// using System.IO;
-
-// namespace m
-// {
-//     class Program
-//     {
-//         static void Main(string[] args)
-//         {
-//             var fromDisk = new PNRFLoader();
-//             var recording = fromDisk.LoadRecording(args[0]);
-
-
-//             Console.WriteLine("Groups");
-//             foreach (var item in recording.Groups.Cast<IDataGroup>())
-//             {
-
-//                 Console.WriteLine(JsonSerializer.Serialize(item));
-//             }
-
-//             Console.WriteLine("Recording:");
-//             File.WriteAllText("Z:/home/vincent/Downloads/PNRF Reader/recording.json", JsonSerializer.Serialize(recording));
-
-//             Console.WriteLine("Recorders:");
-//             // foreach (var recorder in recording.Recorders.Cast<IDataRecorder>())
-//             // {
-//             //     File.WriteAllText($"Z:/home/vincent/Downloads/PNRF Reader/recorder{recorder.Name}.json", JsonSerializer.Serialize(recorder));
-//             // }
-
-//             Console.WriteLine("Channels:");
-//             foreach (var channel in recording.Channels.Cast<IDataChannel>())
-//             {
-//                 var dataSource = channel.get_DataSource(DataSourceSelect.DataSourceSelect_Mixed);
-//                 Console.WriteLine("Name: " + dataSource.Name);
-//                 dataSource.GetUTCTime(out var Year, out var YearDay, out var UTCTime, out var Valid); // Valid: boolean is true when UTC time is available.
-//                 Console.WriteLine("Year: " + Year);
-//                 Console.WriteLine("YearDay: " + YearDay);
-//                 Console.WriteLine("UTCTime: " + UTCTime);
-//                 Console.WriteLine("Valid: " + Valid);
-//                 Console.WriteLine("Real-World UTC Time: " + (new DateTime(Year, 1, 1) + TimeSpan.FromDays(YearDay - 1) + TimeSpan.FromSeconds(UTCTime)));
-//                 Console.WriteLine(JsonSerializer.Serialize(dataSource));
-
-//                 foreach (var property in dataSource.Properties.Cast<IProperty>())
-//                 {
-//                     Console.WriteLine(JsonSerializer.Serialize(property));
-//                 }
-                
-//                 // get start and stop time
-//                 var start = dataSource.Sweeps.StartTime;
-//                 var end = dataSource.Sweeps.EndTime;
-
-//                 Console.WriteLine("Start time: {0} s, End time: {1} s\n", start, end);
-//                 // Console.WriteLine("Press any key to continue or Q to quit.\n");
-
-//                 // var cki = Console.ReadKey(true);
-//                 //     if (cki.Key == ConsoleKey.Q)
-//                 //         return;
-
-//                 // create data array as object
-//                 object segmentsObject;
-
-//                 dataSource.Data(start, end, out segmentsObject);
-
-//                 if (segmentsObject == null)
-//                 {
-//                     Console.WriteLine("No Data.");
-//                     return;
-//                 }
-
-//                 // convert object into segment information
-//                 var segments = segmentsObject as IDataSegments;
-
-
-//                 foreach (var segment in segments.Cast<IDataSegment>())
-//                 {
-//                     var iCnt = segment.NumberOfSamples;
-//                     Console.WriteLine("\nSegment: {0} samples\n", iCnt);
-//                     Console.WriteLine(JsonSerializer.Serialize(segment));
-//                 }
-
-//                 Console.ReadKey();
-//             }
-        
-
-//             // int iSegIndex = 1;              // segment index
-//             // int iCount = mySegments.Count;  // number of segments
-//             // if (iCount < 1)
-//             // {
-//             //     Console.WriteLine("No segments found.\n");
-//             //     return;
-//             // }
-
-//             // // loop through all available segments
-//             // for (iSegIndex = 1; iSegIndex <= iCount; iSegIndex++)
-//             // {
-//             //     // create a single segment
-//             //     IDataSegment mySegment = mySegments[iSegIndex];
-//             //     int iCnt = mySegment.NumberOfSamples;
-//             //     Console.WriteLine("\nSegment {0}: {1} samples\n", iSegIndex, iCnt);
-//             //     Console.WriteLine("Press any key to continue or S to skip");
-//             //     cki = Console.ReadKey(true);
-//             //     if (cki.Key == ConsoleKey.S)
-//             //         continue;
-
-//             //     // create object to hold segment data
-//             //     object varData;
-//             //     // fetch data
-//             //     mySegment.Waveform(DataSourceResultType.DataSourceResultType_Double64, 1, iCnt, 1, out varData);
-
-//             //     if (varData == null)
-//             //     {
-//             //         Console.WriteLine("No valid data found.");
-//             //         return;
-//             //     }
-
-//             //     // convert object to actual double values
-//             //     double[] dSamples = varData as double[];
-
-//             //     double X0 = mySegment.StartTime;
-//             //     double DeltaX = mySegment.SampleInterval;
-//             //     double X, Y;
-
-//             //     for (int i = 0; i < dSamples.Length; i++)
-//             //     {
-//             //         X = X0 + i * DeltaX;
-//             //         Y = dSamples[i];
-//             //         Console.WriteLine("{0}: X = {1}, Y = {2}", i+1, X, Y);
-//             //     }
-//             // }
-//             // Console.WriteLine("\nDone. Press any key to quit.");
-//             // Console.ReadKey();
-//         }
-//     }
-// }
