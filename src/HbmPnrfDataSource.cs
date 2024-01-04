@@ -383,7 +383,7 @@ public class HbmPnrfDataSource : SimpleDataSource
         if (!valid)
             throw new Exception("No UTC time available.");
 
-        return new DateTime(year, DateTimeKind.Utc) + TimeSpan.FromDays(yearDay) + TimeSpan.FromSeconds(utcTime);
+        return new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc) + TimeSpan.FromDays(yearDay - 1) + TimeSpan.FromSeconds(utcTime);
     }
 
     public static int FindNearestFilePath(string[] filePaths, DateTime beginToFind, Func<string, IRecording> loadRecording)
@@ -405,11 +405,13 @@ public class HbmPnrfDataSource : SimpleDataSource
             else if (compare < 0)
                 right = mid - 1;
 
+            /* exact match */
             else
-                break;
+                return mid;
         };
 
-        return mid;
+        /* no match, round down */
+        return mid > 0 ? mid - 1 : 0;
     }
 
     private static DateTime RoundDown(DateTime dateTime, TimeSpan timeSpan)
