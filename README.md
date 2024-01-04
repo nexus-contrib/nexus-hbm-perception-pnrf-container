@@ -33,6 +33,7 @@ In case you want to start from scratch (e.g. if PNRF Reader got an update), it i
 
 2. Put the following xml in a file named `HbmPnrf-Interop.csproj` and compile that project:
 
+```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -60,6 +61,7 @@ In case you want to start from scratch (e.g. if PNRF Reader got an update), it i
     </COMReference>
   </ItemGroup>
 </Project>
+```
 
 3. Copy `Interop.RecordingInterface.dll` and `Interop.RecordingLoaders.dll` from the resulting `obj/` directory into the `src/lib/` directory
 
