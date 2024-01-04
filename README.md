@@ -22,7 +22,7 @@ The docker container does not contain the actual code to read PNRF data to speed
 
 ```bash
 cd <source folder>
-dotnet publish --self-contained --runtime win-x64 --output /app
+dotnet publish --self-contained --runtime win-x64 --output <output folder>
 ```
 
 The executable is then available by running `wine /app/HbmPnrf.exe`. This executable expects specific parameters as it tries to connect to a Nexus instance and is only usable in a meaningful way from via Nexus.
