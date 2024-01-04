@@ -1,5 +1,5 @@
 // Debugging:
-// File.AppendAllText("Z:/root/code/out.txt", "before" + Environment.NewLine);
+// File.AppendAllText("Z:/root/code/out.txt", "your text" + Environment.NewLine);
 
 using Nexus.Remoting;
 using Nexus.Sources;

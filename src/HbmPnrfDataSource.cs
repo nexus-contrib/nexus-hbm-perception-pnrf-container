@@ -28,9 +28,8 @@ public class HbmPnrfDataSource : SimpleDataSource
     {
         get
         {
-            _root ??= (Context.ResourceLocator ?? throw new Exception("The resource locator is null"))
-                .ToPath()
-                .Replace("/var/lib/data/", "Z:/volume1/Daten/raw/");
+            _root ??= "Z:" + (Context.ResourceLocator ?? throw new Exception("The resource locator is null"))
+                .ToPath();
 
             return _root;
         }
