@@ -3,16 +3,25 @@ This repository aims to provide access to the propriertary PNRF Reader Toolkit (
 # Prepare the Docker container
 
 ```bash
-sudo docker build -t nexus-hbm-perception-pnrf-container .
+sudo docker build --no-cache -t docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest .
 
 # allow docker user on local machine to connect to X windows display 
 # (don't know why it works as the docker user does not exists)
 xhost +local:docker
 
-sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d nexus-hbm-perception-pnrf-container
-sudo docker exec -it pnrf-tmp bash -c "./winetricks -q msxml6; wine PNRF\ Reader\ 08.30.22203.exe; exit"
+sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
+
+# install PNRF READER => only works via docker exec and not in Dockerfile ... don't know why :-(
+# When executed in the Dockerfile the installer does not try to open several windows (there are fewer
+# error messages than using the command below. This is the only difference. Maybe the environment is 
+# different in Dockerfile. The command below also works without any display connected.
+sudo docker exec pnrf-tmp wine msiexec /i "PNRF Reader 64-bit.msi" /quiet
+
+# install msxml6 (requires --add-architecture i386 and wine32:i386 :-/)
+sudo docker exec pnrf-tmp ./winetricks -q msxml6
 
 sudo docker commit pnrf-tmp docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
+sudo docker rm -f pnrf-tmp
 sudo docker push docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
 ```
 
