@@ -15,6 +15,7 @@ RUN dpkg --add-architecture i386 &&\
     ln -s /usr/bin/wine /usr/bin/wine64 &&\
     curl -o winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks &&\
     chmod +x winetricks &&\
+    # TODO: use direct silent installation and remove 7zip again!!! PNRF Reader 8.54.23248.exe -SP /q
     # download & extract newest 7zip
     curl -o 7z.tar.xz https://www.7-zip.org/a/7z2301-linux-x64.tar.xz &&\
     tar xf 7z.tar.xz &&\
