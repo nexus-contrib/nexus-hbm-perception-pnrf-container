@@ -1,15 +1,15 @@
-This repository aims to provide access to the propriertary PNRF Reader Toolkit (https://www.hbm.com/de/7557/anbindung-von-genesis-highspeed-und-oder-perception/) so that [Nexus](https://github.com/malstroem-labs/nexus) is able to read HBM Perception `.pnrf` files.
+This repository aims to provide access to the propriertary PNRF Reader Toolkit (https://www.hbm.com/de/7557/anbindung-von-genesis-highspeed-und-oder-perception/) so that [Nexus](https://github.com/nexus-main/nexus) is able to read HBM Perception `.pnrf` files.
 
 # Prepare the Docker container
 
 ```bash
-sudo docker build --no-cache -t docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest .
+sudo docker build --no-cache -t docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest .
 
 # allow docker user on local machine to connect to X windows display 
 # (don't know why it works as the docker user does not exists)
 xhost +local:docker
 
-sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
+sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 
 # install PNRF READER => only works via docker exec and not in Dockerfile ... don't know why :-(
 # When executed in the Dockerfile the installer does not try to open several windows (there are fewer
@@ -20,9 +20,9 @@ sudo docker exec pnrf-tmp wine msiexec /i "PNRF Reader 64-bit.msi" /quiet
 # install msxml6 (requires --add-architecture i386 and wine32:i386 :-/)
 sudo docker exec pnrf-tmp ./winetricks -q msxml6
 
-sudo docker commit pnrf-tmp docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
+sudo docker commit pnrf-tmp docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 sudo docker rm -f pnrf-tmp
-sudo docker push docker.io/apollo3zehn/nexus-hbm-perception-pnrf-container:latest
+sudo docker push docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 ```
 
 # Prepare the application

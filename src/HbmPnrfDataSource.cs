@@ -114,7 +114,7 @@ public class HbmPnrfDataSource : SimpleDataSource
         // for each file
         for (int i = nearestFileIndex; i < potentialFiles.Length - 1; i++)
         {
-            var filePath = potentialFiles[nearestFileIndex];
+            var filePath = potentialFiles[i];
             var fileBegin = GetFileBegin(filePath, LoadRecording);
 
             // this file contains data for a later date: leave loop
