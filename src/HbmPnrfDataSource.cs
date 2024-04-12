@@ -169,7 +169,7 @@ public class HbmPnrfDataSource : SimpleDataSource
                 var segments = (IDataSegments)segmentsObject;
 
                 // for each segment
-                Logger.LogTrace("Processing {SegmentCount} segments", segments.Count);
+                Logger.LogTrace("Processing {SegmentCount} segment(s)", segments.Count);
 
                 var segmentNumber = 0;
 
@@ -207,6 +207,8 @@ public class HbmPnrfDataSource : SimpleDataSource
 
                     var segmentEnd = fileBegin + TimeSpan.FromSeconds(segment.EndTime);
                     var roundedSegmentEnd = RoundDown(segmentEnd, samplePeriod);
+
+                    Logger.LogTrace("The segment contains data from {SegmentBegin} to {SegmentEnd}", segmentBegin, segmentEnd);
 
                     if (segmentEnd < begin)
                     {
