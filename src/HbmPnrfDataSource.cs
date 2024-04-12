@@ -112,10 +112,12 @@ public class HbmPnrfDataSource : SimpleDataSource
         Logger.LogTrace("Nearest file path for {Begin} is {FilePath}", begin, potentialFiles[nearestFileIndex]);
 
         // for each file
-        for (int i = nearestFileIndex; i < potentialFiles.Length - 1; i++)
+        for (int i = nearestFileIndex; i < potentialFiles.Length; i++)
         {
             var filePath = potentialFiles[i];
             var fileBegin = GetFileBegin(filePath, LoadRecording);
+
+            Logger.LogTrace($"Current file begin is {fileBegin}");
 
             // this file contains data for a later date: leave loop
             if (fileBegin >= end)
