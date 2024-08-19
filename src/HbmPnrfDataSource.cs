@@ -285,76 +285,79 @@ public class HbmPnrfDataSource : SimpleDataSource
 
         foreach (var group in recording.Groups.Cast<IDataGroup>())
         {
-            foreach (var channel in group.Recording.Channels.Cast<IDataChannel>())
+            foreach (IDataRecorder recorder in group.Recorders)
             {
-                Logger.LogDebug("Processing channel {ChannelName}", channel.Name);
-
-                // get data source
-                // if (channel.ChannelType != DataChannelType.DataChannelType_Analog)
-                // {
-                //     Logger.LogTrace("Channel {ChannelName} is not of type 'analog'. Skipping.", channel.Name);
-                //     continue;
-                // }
-
-                // "The safest option is to go always for the mixed datasource."
-                var dataSource = channel.get_DataSource(DataSourceSelect.DataSourceSelect_Mixed);
-
-                if (!(
-                    dataSource.DataType == DataSourceDataType.DataSourceDataType_AnalogWaveform ||
-                    dataSource.DataType == DataSourceDataType.DataSourceDataType_DigitalWaveform
-                ))
+                foreach (var channel in recorder.Channels.Cast<IDataChannel>())
                 {
-                    Logger.LogTrace("Data source is of type {DataSourceDataType} instead of 'AnalogWaveform' or 'DigitalWaveform'. Skipping.", dataSource.DataType);
-                    continue;
+                    Logger.LogDebug("Processing channel {ChannelName}", channel.Name);
+
+                    // get data source
+                    if (channel.ChannelType != DataChannelType.DataChannelType_Analog)
+                    {
+                        Logger.LogTrace("Channel {ChannelName} is not of type 'analog'. Skipping.", channel.Name);
+                        continue;
+                    }
+
+                    // "The safest option is to go always for the mixed datasource."
+                    var dataSource = channel.get_DataSource(DataSourceSelect.DataSourceSelect_Mixed);
+
+                    if (!(
+                        dataSource.DataType == DataSourceDataType.DataSourceDataType_AnalogWaveform ||
+                        dataSource.DataType == DataSourceDataType.DataSourceDataType_DigitalWaveform
+                    ))
+                    {
+                        Logger.LogTrace("Data source is of type {DataSourceDataType} instead of 'AnalogWaveform' or 'DigitalWaveform'. Skipping.", dataSource.DataType);
+                        continue;
+                    }
+
+                    // get segments
+                    object segmentsObject;
+
+                    dataSource.Data(dataSource.Sweeps.StartTime, dataSource.Sweeps.EndTime, out segmentsObject);
+
+                    if (segmentsObject is null)
+                    {
+                        Logger.LogDebug("Channel has no data. Unable to determine sample period. Skipping.");
+                        continue;
+                    }
+
+                    var segments = (segmentsObject as IDataSegments)!;
+
+                    // create resource builder
+                    if (!TryEnforceNamingConvention(channel.Name, out var resourceId))
+                    {
+                        Logger.LogDebug("Channel {ChannelName} has an invalid name. Skipping.", channel.Name);
+                        continue;
+                    }
+
+                    var resourceBuilder = new ResourceBuilder(id: resourceId)
+                        .WithGroups(group.Name)
+                        .WithProperty(OriginalNameKey, channel.Name);
+
+                    if (!string.IsNullOrWhiteSpace(dataSource.YUnit))
+                        resourceBuilder.WithUnit(dataSource.YUnit);
+
+                    // create unique representations
+                    var samplePeriods = new HashSet<TimeSpan>();
+
+                    foreach (var segment in segments.Cast<IDataSegment>())
+                    {
+                        samplePeriods.Add(TimeSpan.FromSeconds(segment.SampleInterval));
+                    }
+
+                    foreach (var samplePeriod in samplePeriods)
+                    {
+                        var representation = new Representation(
+                            dataType: NexusDataType.FLOAT64,
+                            samplePeriod: samplePeriod);
+
+                        resourceBuilder
+                            .AddRepresentation(representation);
+                    }
+
+                    // add resource
+                    catalogBuilder.AddResource(resourceBuilder.Build());
                 }
-
-                // get segments
-                object segmentsObject;
-
-                dataSource.Data(dataSource.Sweeps.StartTime, dataSource.Sweeps.EndTime, out segmentsObject);
-
-                if (segmentsObject is null)
-                {
-                    Logger.LogDebug("Channel has no data. Unable to determine sample period. Skipping.");
-                    continue;
-                }
-
-                var segments = (segmentsObject as IDataSegments)!;
-
-                // create resource builder
-                if (!TryEnforceNamingConvention(channel.Name, out var resourceId))
-                {
-                    Logger.LogDebug("Channel {ChannelName} has an invalid name. Skipping.", channel.Name);
-                    continue;
-                }
-
-                var resourceBuilder = new ResourceBuilder(id: resourceId)
-                    .WithGroups(group.Name)
-                    .WithProperty(OriginalNameKey, channel.Name);
-
-                if (!string.IsNullOrWhiteSpace(dataSource.YUnit))
-                    resourceBuilder.WithUnit(dataSource.YUnit);
-
-                // create unique representations
-                var samplePeriods = new HashSet<TimeSpan>();
-
-                foreach (var segment in segments.Cast<IDataSegment>())
-                {
-                    samplePeriods.Add(TimeSpan.FromSeconds(segment.SampleInterval));
-                }
-
-                foreach (var samplePeriod in samplePeriods)
-                {
-                    var representation = new Representation(
-                        dataType: NexusDataType.FLOAT64,
-                        samplePeriod: samplePeriod);
-
-                    resourceBuilder
-                        .AddRepresentation(representation);
-                }
-
-                // add resource
-                catalogBuilder.AddResource(resourceBuilder.Build());
             }
         }
     }
