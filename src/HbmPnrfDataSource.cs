@@ -12,6 +12,10 @@ namespace Nexus.Sources;
 // Implementation is based on https://www.hbm.com/fileadmin/mediapool/hbmdoc/technical/i2697.pdf
 // See also section E "Sweeps and Segments" for a good introduction about how sweeps work
 
+[ExtensionDescription(
+    "Provides catalogs with HBM PNRF data.",
+    "https://github.com/nexus-contrib/nexus-hbm-perception-pnrf-container",
+    "https://github.com/nexus-contrib/nexus-hbm-perception-pnrf-container/blob/master/src/HbmPnrfDataSource.cs")]
 public class HbmPnrfDataSource : SimpleDataSource
 {
     record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory);
@@ -63,7 +67,7 @@ public class HbmPnrfDataSource : SimpleDataSource
             return Task.FromResult(Array.Empty<CatalogRegistration>());
     }
 
-    public override Task<ResourceCatalog> GetCatalogAsync(string catalogId, CancellationToken cancellationToken)
+    public override Task<ResourceCatalog> EnrichCatalogAsync(ResourceCatalog catalog, CancellationToken cancellationToken)
     {
         var catalogBuilder = new ResourceCatalogBuilder(id: Config.CatalogId);
         AddResources(catalogBuilder);

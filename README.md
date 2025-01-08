@@ -5,9 +5,8 @@ This repository aims to provide access to the propriertary PNRF Reader Toolkit (
 ```bash
 sudo docker build --no-cache -t docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest .
 
-# allow docker user on local machine to connect to X windows display 
-# (don't know why it works as the docker user does not exists)
-xhost +local:docker
+# allow application to connect to X windows display 
+xhost +
 
 sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 
@@ -23,11 +22,14 @@ sudo docker exec pnrf-tmp ./winetricks -q msxml6
 sudo docker commit pnrf-tmp docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 sudo docker rm -f pnrf-tmp
 sudo docker push docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
+
+# revert permission
+xhost -
 ```
 
 # Prepare the application
 
-The docker container does not contain the actual code to read PNRF data to speed up the development cycle. The code itself may be mounted into the container and compiled there (.NET 8 SDK is availabe within the container) like this:
+The docker container does not contain the actual code to read PNRF data to speed up the development cycle. The code itself may be mounted into the container and compiled there (.NET 9 SDK is availabe within the container) like this:
 
 ```bash
 cd <source folder>
@@ -46,7 +48,7 @@ In case you want to start from scratch (e.g. if PNRF Reader got an update), it i
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
