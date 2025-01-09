@@ -10,20 +10,25 @@ xhost +
 
 sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 
-# install PNRF READER => only works via docker exec and not in Dockerfile ... don't know why :-(
-# When executed in the Dockerfile the installer does not try to open several windows (there are fewer
-# error messages than using the command below. This is the only difference. Maybe the environment is 
-# different in Dockerfile. The command below also works without any display connected.
-sudo docker exec pnrf-tmp wine msiexec /i "PNRF Reader 64-bit.msi" /quiet
+# Install PNRF READER => only works via docker exec and not in Dockerfile ... it seems
+# that within the Dockerfile it is not possible to open windows as so we get this message:
+# "Application tried to create a window, but no driver could be loaded."
+sudo docker exec pnrf-tmp wine PNRF_Reader.exe -sp"/q"
 
-# install msxml6 (requires --add-architecture i386 and wine32:i386 :-/)
+# Install msxml6 (requires --add-architecture i386 and wine32:i386 :-/).
+# See also comment from above (window error).
 sudo docker exec pnrf-tmp ./winetricks -q msxml6
 
+# Install .NET 9 (do get wine-mono) and .NET 9 SDK
+sudo docker exec pnrf-tmp ./winetricks -q dotnet9
+sudo docker exec pnrf-tmp wine dotnet-9-sdk.exe /install /quiet /norestart
+
+# Save changes
 sudo docker commit pnrf-tmp docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 sudo docker rm -f pnrf-tmp
 sudo docker push docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 
-# revert permission
+# Revert permission
 xhost -
 ```
 
