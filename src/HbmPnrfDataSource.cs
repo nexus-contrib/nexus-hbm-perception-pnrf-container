@@ -397,6 +397,45 @@ public class HbmPnrfDataSource : SimpleDataSource
         }
     }
 
+    public int FindNearestFilePath(string[] filePaths, DateTime beginToFind, Func<string, IRecording> loadRecording)
+    {
+        var left = 0;
+        var right = filePaths.Length - 1;
+        var mid = 0;
+
+        while (left <= right)
+        {
+            mid = left + (right - left) / 2;
+
+            DateTime midBegin;
+
+            try
+            {
+                midBegin = GetFileBegin(filePaths[mid], loadRecording);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Unable to open file {FilePath}", filePaths);
+                midBegin = DateTime.MinValue;
+            }
+
+            var compare = beginToFind.CompareTo(midBegin);
+
+            if (compare > 0)
+                left = mid + 1;
+
+            else if (compare < 0)
+                right = mid - 1;
+
+            /* exact match */
+            else
+                return mid;
+        };
+
+        /* no match, round down */
+        return mid > 0 ? mid - 1 : 0;
+    }
+
     private static bool TryEnforceNamingConvention(string resourceId, [NotNullWhen(returnValue: true)] out string newResourceId)
     {
         newResourceId = resourceId;
@@ -426,34 +465,6 @@ public class HbmPnrfDataSource : SimpleDataSource
             throw new Exception("No UTC time available.");
 
         return new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc) + TimeSpan.FromDays(yearDay - 1) + TimeSpan.FromSeconds(utcTime);
-    }
-
-    public static int FindNearestFilePath(string[] filePaths, DateTime beginToFind, Func<string, IRecording> loadRecording)
-    {
-        var left = 0;
-        var right = filePaths.Length - 1;
-        var mid = 0;
-
-        while (left <= right)
-        {
-            mid = left + (right - left) / 2;
-
-            var midBegin = GetFileBegin(filePaths[mid], loadRecording);
-            var compare = beginToFind.CompareTo(midBegin);
-
-            if (compare > 0)
-                left = mid + 1;
-
-            else if (compare < 0)
-                right = mid - 1;
-
-            /* exact match */
-            else
-                return mid;
-        };
-
-        /* no match, round down */
-        return mid > 0 ? mid - 1 : 0;
     }
 
     private static DateTime RoundDown(DateTime dateTime, TimeSpan timeSpan)
