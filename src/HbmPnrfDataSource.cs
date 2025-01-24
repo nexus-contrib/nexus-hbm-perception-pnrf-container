@@ -18,7 +18,7 @@ namespace Nexus.Sources;
     "https://github.com/nexus-contrib/nexus-hbm-perception-pnrf-container/blob/master/src/HbmPnrfDataSource.cs")]
 public class HbmPnrfDataSource : SimpleDataSource
 {
-    record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory);
+    record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory, string GlobPattern);
 
     private const string OriginalNameKey = "original-name";
 
@@ -278,7 +278,7 @@ public class HbmPnrfDataSource : SimpleDataSource
         var searchPath = Path.Combine(Root, Config.DataDirectory);
 
         var firstFilePath = Directory
-            .GetFiles(searchPath, "Recording*.pnrf", SearchOption.AllDirectories)
+            .GetFiles(searchPath, Config.GlobPattern, SearchOption.AllDirectories)
             .Order()
             .FirstOrDefault();
 
