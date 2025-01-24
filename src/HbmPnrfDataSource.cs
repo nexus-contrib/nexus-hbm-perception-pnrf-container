@@ -110,7 +110,16 @@ public class HbmPnrfDataSource : SimpleDataSource
             .Order()
             .Where(filePath =>
             {
-                var canLoad = _pnrfLoader.CanLoadRecording(filePath) != 0;
+                /* https://www.hbm.com/fileadmin/mediapool/hbmdoc/technical/i2697.pdf
+                 *
+                 * "The FromDisk.CanLoadRecording() returns a value between 0 and 100.
+                 * A zero value indicates that the loader can definitely not load the requested file,
+                 * a value of 100 means the loader can read and interpret the file for sure. A value
+                 * in between can be interpreted as a percentage of certainty to do a succesful
+                 * load."
+                 */
+
+                var canLoad = _pnrfLoader.CanLoadRecording(filePath) > 0;
 
                 if (!canLoad)
                     Logger.LogTrace("PNRF reader indicates it is unable to load file {FilePath}.", filePath);
