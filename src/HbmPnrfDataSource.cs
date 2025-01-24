@@ -293,12 +293,19 @@ public class HbmPnrfDataSource : SimpleDataSource
             {
                 foreach (var channel in recorder.Channels.Cast<IDataChannel>())
                 {
-                    Logger.LogDebug("Processing channel {ChannelName}", channel.Name);
+                    var channelName = $"{group.Name}_{recorder.Name}_{channel.Name}"
+                        .Replace(" ", "_")
+                        .Replace(".", "_")
+                        .Replace("∑", "sum")
+                        .Replace("φ", "phi")
+                        .Replace("λ", "lambda");
+
+                    Logger.LogDebug("Processing channel {ChannelName}", channelName);
 
                     // get data source
                     if (channel.ChannelType != DataChannelType.DataChannelType_Analog)
                     {
-                        Logger.LogTrace("Channel {ChannelName} is not of type 'analog'. Skipping.", channel.Name);
+                        Logger.LogTrace("Channel {ChannelName} is not of type 'analog'. Skipping.", channelName);
                         continue;
                     }
 
@@ -328,15 +335,17 @@ public class HbmPnrfDataSource : SimpleDataSource
                     var segments = (segmentsObject as IDataSegments)!;
 
                     // create resource builder
-                    if (!TryEnforceNamingConvention(channel.Name, out var resourceId))
+                    if (!TryEnforceNamingConvention(channelName, out var resourceId))
                     {
-                        Logger.LogDebug("Channel {ChannelName} has an invalid name. Skipping.", channel.Name);
+                        Logger.LogDebug("Channel {ChannelName} has an invalid name. Skipping.", channelName);
                         continue;
                     }
 
+                    Logger.LogDebug("Processing channel {ChannelName}", resourceId);
+
                     var resourceBuilder = new ResourceBuilder(id: resourceId)
-                        .WithGroups(group.Name)
-                        .WithProperty(OriginalNameKey, channel.Name);
+                        .WithGroups($"{group.Name} - {recorder.Name}")
+                        .WithProperty(OriginalNameKey, channelName);
 
                     if (!string.IsNullOrWhiteSpace(dataSource.YUnit))
                         resourceBuilder.WithUnit(dataSource.YUnit);
