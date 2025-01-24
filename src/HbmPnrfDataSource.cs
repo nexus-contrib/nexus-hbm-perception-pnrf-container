@@ -101,7 +101,7 @@ public class HbmPnrfDataSource : SimpleDataSource
 
         // TODO ".Order" works probably only until Recording 999 is reached as it is unclear what happens then
         var potentialFiles = Directory
-            .GetFiles(searchPath, "Recording*.pnrf", SearchOption.AllDirectories)
+            .GetFiles(searchPath, Config.GlobPattern, SearchOption.AllDirectories)
             .Order()
             .ToArray();
 
@@ -185,7 +185,11 @@ public class HbmPnrfDataSource : SimpleDataSource
                     segmentNumber++;
 
                     // validate sample period
-                    var samplePeriod = TimeSpan.FromSeconds(segment.SampleInterval);
+                    /* PNRF file may contain numbers like 1.9999999999999998E-05
+                     * so we round to 100 ns before further processing
+                     */
+                    var samplePeriod = TimeSpan.FromSeconds(Math.Round(segment.SampleInterval, 8));
+                    Logger.LogWarning("Sampleperiod: {sp}", samplePeriod);
 
                     if (samplePeriod != request.CatalogItem.Representation.SamplePeriod)
                     {
@@ -355,7 +359,10 @@ public class HbmPnrfDataSource : SimpleDataSource
 
                     foreach (var segment in segments.Cast<IDataSegment>())
                     {
-                        samplePeriods.Add(TimeSpan.FromSeconds(segment.SampleInterval));
+                        /* PNRF file may contain numbers like 1.9999999999999998E-05
+                         * so we round to 100 ns before further processing
+                         */
+                        samplePeriods.Add(TimeSpan.FromSeconds(Math.Round(segment.SampleInterval, 8)));
                     }
 
                     foreach (var samplePeriod in samplePeriods)
