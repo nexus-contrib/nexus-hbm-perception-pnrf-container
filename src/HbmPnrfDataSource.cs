@@ -21,8 +21,11 @@ public class HbmPnrfDataSource : SimpleDataSource
     record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory, string GlobPattern);
 
     private const string ORIGINAL_NAME_KEY = "original-name";
+
     private const string PNRF_GROUP_KEY = "pnrf-group";
+
     private const string PNRF_RECORDER_KEY = "pnrf-recorder";
+
     private static PNRFLoader _pnrfLoader = new();
 
     private string? _root;
@@ -105,6 +108,15 @@ public class HbmPnrfDataSource : SimpleDataSource
         var potentialFiles = Directory
             .GetFiles(searchPath, Config.GlobPattern, SearchOption.AllDirectories)
             .Order()
+            .Where(filePath =>
+            {
+                var canLoad = _pnrfLoader.CanLoadRecording(filePath) != 0;
+
+                if (!canLoad)
+                    Logger.LogTrace("PNRF reader indicates it is unable to load file {FilePath}.", filePath);
+
+                return canLoad;
+            })
             .ToArray();
 
         if (!potentialFiles.Any())
@@ -407,17 +419,8 @@ public class HbmPnrfDataSource : SimpleDataSource
         {
             mid = left + (right - left) / 2;
 
-            DateTime midBegin;
-
-            try
-            {
-                midBegin = GetFileBegin(filePaths[mid], loadRecording);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Unable to open file {FilePath}", filePaths);
-                midBegin = DateTime.MinValue;
-            }
+            var midBegin = GetFileBegin(filePaths[mid], loadRecording);
+            Logger.LogTrace("Begin is {FileBegin}", midBegin);
 
             var compare = beginToFind.CompareTo(midBegin);
 
