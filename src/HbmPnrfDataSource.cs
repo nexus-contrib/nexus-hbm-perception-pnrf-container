@@ -20,8 +20,9 @@ public class HbmPnrfDataSource : SimpleDataSource
 {
     record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory, string GlobPattern);
 
-    private const string OriginalNameKey = "original-name";
-
+    private const string ORIGINAL_NAME_KEY = "original-name";
+    private const string PNRF_GROUP_KEY = "pnrf-group";
+    private const string PNRF_RECORDER_KEY = "pnrf-recorder";
     private static PNRFLoader _pnrfLoader = new();
 
     private string? _root;
@@ -139,11 +140,21 @@ public class HbmPnrfDataSource : SimpleDataSource
             {
                 // find channel
                 var channelName = request.CatalogItem.Resource.Properties!
-                    .GetStringValue(OriginalNameKey)!;
+                    .GetStringValue(ORIGINAL_NAME_KEY)!;
+
+                var channelRecorder = request.CatalogItem.Resource.Properties!
+                    .GetStringValue(PNRF_RECORDER_KEY)!;
+
+                var channelGroup = request.CatalogItem.Resource.Properties!
+                    .GetStringValue(PNRF_GROUP_KEY)!;
 
                 var channel = recording.Channels
                     .Cast<IDataChannel>()
-                    .FirstOrDefault(channel => channel.Name == channelName);
+                    .FirstOrDefault(channel => 
+                        channel.Name == channelName && 
+                        channel.Recorder.Name == channelRecorder &&
+                        channel.Recorder.Group.Name == channelGroup
+                    );
 
                 if (channel is null)
                 {
@@ -349,7 +360,9 @@ public class HbmPnrfDataSource : SimpleDataSource
 
                     var resourceBuilder = new ResourceBuilder(id: resourceId)
                         .WithGroups($"{group.Name} - {recorder.Name}")
-                        .WithProperty(OriginalNameKey, channelName);
+                        .WithProperty(ORIGINAL_NAME_KEY, channel.Name)
+                        .WithProperty(PNRF_GROUP_KEY, group.Name)
+                        .WithProperty(PNRF_RECORDER_KEY, recorder.Name);
 
                     if (!string.IsNullOrWhiteSpace(dataSource.YUnit))
                         resourceBuilder.WithUnit(dataSource.YUnit);
