@@ -90,6 +90,7 @@ public class HbmPnrfDataSource : SimpleDataSource
         {
             if (!filePathToRecordingMap!.TryGetValue(filePath, out var recording))
             {
+                Logger.LogTrace("Open file {FilePath}", filePath);
                 recording = _pnrfLoader.LoadRecording(filePath);
                 filePathToRecordingMap[filePath] = recording;
             }
@@ -300,6 +301,7 @@ public class HbmPnrfDataSource : SimpleDataSource
         if (firstFilePath is null)
             return;
 
+        Logger.LogTrace("Open file {FilePath}", firstFilePath);
         var recording = _pnrfLoader.LoadRecording(firstFilePath);
 
         foreach (var group in recording.Groups.Cast<IDataGroup>())
