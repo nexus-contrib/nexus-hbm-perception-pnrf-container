@@ -34,15 +34,6 @@ xhost -
 
 # Prepare the application
 
-The docker container does not contain the actual code to read PNRF data to speed up the development cycle. The code itself may be mounted into the container and compiled there (.NET 9 SDK is availabe within the container) like this:
-
-```bash
-cd <source folder>
-dotnet publish --self-contained --runtime win-x64 --output <output folder>
-```
-
-The executable is then available by running `wine /app/HbmPnrf.exe`. This executable expects specific parameters as it tries to connect to a Nexus instance and is only usable in a meaningful way from via Nexus.
-
 In case you want to start from scratch (e.g. if PNRF Reader got an update), it is necessary to create `Interop.RecordingInterface.dll` and `Interop.RecordingLoaders.dll` first by doing the following:
 
 1. Install `PNRF Reader 6.30.22203.exe` on a Windows machine
