@@ -19,7 +19,7 @@ sudo docker exec pnrf-tmp wine PNRF_Reader.exe -sp"/q"
 # See also comment from above (window error).
 sudo docker exec pnrf-tmp ./winetricks -q msxml6
 
-# Install .NET 9 (do get wine-mono) and .NET 9 SDK
+# Install .NET 9 (to get wine-mono) and .NET 9 SDK
 sudo docker exec pnrf-tmp ./winetricks -q dotnet9
 sudo docker exec pnrf-tmp wine dotnet-9-sdk.exe /install /quiet /norestart
 
