@@ -11,7 +11,7 @@ xhost +
 sudo docker run --name pnrf-tmp --network host -e DISPLAY=$DISPLAY -d docker.io/nexusmain/nexus-hbm-perception-pnrf-container:latest
 
 # Install PNRF READER => only works via docker exec and not in Dockerfile ... it seems
-# that within the Dockerfile it is not possible to open windows as so we get this message:
+# that within the Dockerfile it is not possible to open windows and we get this message:
 # "Application tried to create a window, but no driver could be loaded."
 sudo docker exec pnrf-tmp wine PNRF_Reader.exe -sp"/q"
 
