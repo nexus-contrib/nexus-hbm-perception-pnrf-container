@@ -16,7 +16,7 @@ namespace Nexus.Sources;
     "Provides catalogs with HBM PNRF data.",
     "https://github.com/nexus-contrib/nexus-hbm-perception-pnrf-container",
     "https://github.com/nexus-contrib/nexus-hbm-perception-pnrf-container/blob/master/src/HbmPnrfDataSource.cs")]
-public class HbmPnrfDataSource : SimpleDataSource
+public class HbmPnrfDataSource : SimpleDataSource<object?>
 {
     record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory, string GlobPattern);
 
