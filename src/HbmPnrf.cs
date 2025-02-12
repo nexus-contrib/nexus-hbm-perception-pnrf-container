@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Nexus.DataModel;
 using Nexus.Extensibility;
@@ -15,8 +14,16 @@ namespace Nexus.Sources;
 /// <summary>
 /// Settings for the HbmPnrf data source.
 /// </summary>
+/// <param name="CatalogId">The catalog identifier.</param>
+/// <param name="Title">The optional catalog title.</param>
+/// <param name="DataDirectory">The relative data directory path.</param>
+/// <param name="GlobPattern">The glob pattern to search files.</param>
 /// <param name="CatalogSourceFiles">The source files to populate the catalog with resources.</param>
 public record HbmPnrfSettings(
+    string CatalogId,
+    string? Title,
+    string DataDirectory,
+    string GlobPattern,
     string[]? CatalogSourceFiles
 );
 
@@ -26,8 +33,6 @@ public record HbmPnrfSettings(
     "https://github.com/nexus-contrib/nexus-hbm-perception-pnrf-container/blob/master/src/HbmPnrfDataSource.cs")]
 public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
 {
-    record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory, string GlobPattern);
-
     private const string ORIGINAL_NAME_KEY = "original-name";
 
     private const string PNRF_GROUP_KEY = "pnrf-group";
@@ -38,7 +43,6 @@ public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
 
     private string? _root;
 
-    private HbmPnrfConfig? _config;
 
     private string Root
     {
@@ -51,32 +55,19 @@ public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
         }
     }
 
-    private HbmPnrfConfig Config
-    {
-        get
-        {
-            if (_config is null)
-            {
-                var configFilePath = Path.Combine(Root, "config.json");
-
-                if (!File.Exists(configFilePath))
-                    throw new Exception($"Configuration file {configFilePath} not found.");
-
-                var jsonString = File.ReadAllText(configFilePath);
-                _config = JsonSerializer.Deserialize<HbmPnrfConfig>(jsonString) ?? throw new Exception("config is null");
-            }
-
-            return _config;
-        }
-    }
-
     public override Task<CatalogRegistration[]> GetCatalogRegistrationsAsync(
         string path,
         CancellationToken cancellationToken
     )
     {
         if (path == "/")
-            return Task.FromResult(new[] { new CatalogRegistration(Config.CatalogId, Config.Title) });
+            return Task.FromResult(new[]
+            {
+                new CatalogRegistration(
+                    Context.SourceConfiguration.CatalogId,
+                    Context.SourceConfiguration.Title
+                )
+            });
 
         else
             return Task.FromResult(Array.Empty<CatalogRegistration>());
@@ -99,10 +90,10 @@ public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
         
         else
         {
-            var searchPath = Path.Combine(Root, Config.DataDirectory);
+            var searchPath = Path.Combine(Root, Context.SourceConfiguration.DataDirectory);
 
             var firstFilePath = Directory
-                .GetFiles(searchPath, Config.GlobPattern, SearchOption.AllDirectories)
+                .GetFiles(searchPath, Context.SourceConfiguration.GlobPattern, SearchOption.AllDirectories)
                 .Order()
                 .FirstOrDefault();
 
@@ -113,7 +104,7 @@ public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
 
         foreach (var filePath in filePaths)
         {
-            var catalogBuilder = new ResourceCatalogBuilder(id: Config.CatalogId);
+            var catalogBuilder = new ResourceCatalogBuilder(id: Context.SourceConfiguration.CatalogId);
 
             AddResources(filePath, catalogBuilder);
 
@@ -146,11 +137,11 @@ public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
         }
 
         // find and load file
-        var searchPath = Path.Combine(Root, Config.DataDirectory);
+        var searchPath = Path.Combine(Root, Context.SourceConfiguration.DataDirectory);
 
         // TODO ".Order" works probably only until Recording 999 is reached as it is unclear what happens then
         var potentialFiles = Directory
-            .GetFiles(searchPath, Config.GlobPattern, SearchOption.AllDirectories)
+            .GetFiles(searchPath, Context.SourceConfiguration.GlobPattern, SearchOption.AllDirectories)
             .Order()
             .Where(filePath =>
             {
