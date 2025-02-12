@@ -12,11 +12,19 @@ namespace Nexus.Sources;
 // Implementation is based on https://www.hbm.com/fileadmin/mediapool/hbmdoc/technical/i2697.pdf
 // See also section E "Sweeps and Segments" for a good introduction about how sweeps work
 
+/// <summary>
+/// Settings for the HbmPnrf data source.
+/// </summary>
+/// <param name="CatalogSourceFiles">The source files to populate the catalog with resources.</param>
+public record HbmPnrfSettings(
+    string[]? CatalogSourceFiles
+);
+
 [ExtensionDescription(
     "Provides catalogs with HBM PNRF data.",
     "https://github.com/nexus-contrib/nexus-hbm-perception-pnrf-container",
     "https://github.com/nexus-contrib/nexus-hbm-perception-pnrf-container/blob/master/src/HbmPnrfDataSource.cs")]
-public class HbmPnrfDataSource : SimpleDataSource<object?>
+public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
 {
     record HbmPnrfConfig(string CatalogId, string Title, string DataDirectory, string GlobPattern);
 
@@ -62,7 +70,10 @@ public class HbmPnrfDataSource : SimpleDataSource<object?>
         }
     }
 
-    public override Task<CatalogRegistration[]> GetCatalogRegistrationsAsync(string path, CancellationToken cancellationToken)
+    public override Task<CatalogRegistration[]> GetCatalogRegistrationsAsync(
+        string path,
+        CancellationToken cancellationToken
+    )
     {
         if (path == "/")
             return Task.FromResult(new[] { new CatalogRegistration(Config.CatalogId, Config.Title) });
@@ -71,12 +82,45 @@ public class HbmPnrfDataSource : SimpleDataSource<object?>
             return Task.FromResult(Array.Empty<CatalogRegistration>());
     }
 
-    public override Task<ResourceCatalog> EnrichCatalogAsync(ResourceCatalog catalog, CancellationToken cancellationToken)
+    public override Task<ResourceCatalog> EnrichCatalogAsync(
+        ResourceCatalog catalog,
+        CancellationToken cancellationToken
+    )
     {
-        var catalogBuilder = new ResourceCatalogBuilder(id: Config.CatalogId);
-        AddResources(catalogBuilder);
+        var filePaths = default(string[]);
 
-        return Task.FromResult(catalogBuilder.Build());
+        if (Context.SourceConfiguration.CatalogSourceFiles is not null)
+        {
+            filePaths = Context.SourceConfiguration.CatalogSourceFiles
+                .Where(filePath => filePath is not null)
+                .Select(filePath => Path.Combine(Root, filePath!))
+                .ToArray();
+        }
+        
+        else
+        {
+            var searchPath = Path.Combine(Root, Config.DataDirectory);
+
+            var firstFilePath = Directory
+                .GetFiles(searchPath, Config.GlobPattern, SearchOption.AllDirectories)
+                .Order()
+                .FirstOrDefault();
+
+            filePaths = firstFilePath is null
+                ? []
+                : [firstFilePath];
+        }
+
+        foreach (var filePath in filePaths)
+        {
+            var catalogBuilder = new ResourceCatalogBuilder(id: Config.CatalogId);
+
+            AddResources(filePath, catalogBuilder);
+
+            catalog = catalog.Merge(catalogBuilder.Build());
+        }
+
+        return Task.FromResult(catalog);
     }
 
     public override Task ReadAsync(
@@ -310,20 +354,10 @@ public class HbmPnrfDataSource : SimpleDataSource<object?>
         return Task.CompletedTask;
     }
 
-    private void AddResources(ResourceCatalogBuilder catalogBuilder)
+    private void AddResources(string filePath, ResourceCatalogBuilder catalogBuilder)
     {
-        var searchPath = Path.Combine(Root, Config.DataDirectory);
-
-        var firstFilePath = Directory
-            .GetFiles(searchPath, Config.GlobPattern, SearchOption.AllDirectories)
-            .Order()
-            .FirstOrDefault();
-
-        if (firstFilePath is null)
-            return;
-
-        Logger.LogTrace("Open file {FilePath}", firstFilePath);
-        var recording = _pnrfLoader.LoadRecording(firstFilePath);
+        Logger.LogTrace("Open file {FilePath}", filePath);
+        var recording = _pnrfLoader.LoadRecording(filePath);
 
         foreach (var group in recording.Groups.Cast<IDataGroup>())
         {
