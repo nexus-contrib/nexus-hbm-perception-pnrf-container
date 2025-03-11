@@ -43,7 +43,6 @@ public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
 
     private string? _root;
 
-
     private string Root
     {
         get
@@ -257,7 +256,6 @@ public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
                      * so we round to 100 ns before further processing
                      */
                     var samplePeriod = TimeSpan.FromSeconds(Math.Round(segment.SampleInterval, 8));
-                    Logger.LogWarning("Sampleperiod: {sp}", samplePeriod);
 
                     if (samplePeriod != request.CatalogItem.Representation.SamplePeriod)
                     {
