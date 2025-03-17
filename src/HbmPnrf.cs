@@ -402,8 +402,6 @@ public class HbmPnrf : SimpleDataSource<HbmPnrfSettings>
                         continue;
                     }
 
-                    Logger.LogDebug("Processing channel {ChannelName}", resourceId);
-
                     var resourceBuilder = new ResourceBuilder(id: resourceId)
                         .WithGroups($"{group.Name} - {recorder.Name}")
                         .WithProperty(ORIGINAL_NAME_KEY, channel.Name)
